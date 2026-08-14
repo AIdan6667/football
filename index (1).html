@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Пенальти — Ночная серия</title>
+<style>
+  :root{
+    --sky-top:#050b1a;
+    --sky-bottom:#0d1b33;
+    --grass-1:#1e5c2f;
+    --grass-2:#237537;
+    --line:#f4f1ea;
+    --floodlight:#ffe27a;
+    --floodlight-glow:rgba(255,226,122,0.35);
+    --accent:#ff5a3c;
+    --accent-dim:#b23f2a;
+    --panel:#0a1428;
+    --panel-border:#1c2e4d;
+    --text:#f4f1ea;
+    --text-dim:#9fb0c9;
+    --save:#3fb0ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background: linear-gradient(var(--sky-top), var(--sky-bottom));
+    font-family:'Courier New', ui-monospace, monospace;
+    color:var(--text);
+    overflow-x:hidden;
+  }
+  .display{
+    font-family: Georgia, 'Times New Roman', serif;
+    letter-spacing:0.03em;
+  }
+
+  #wrap{
+    max-width:720px;
+    margin:0 auto;
+    padding:24px 16px 60px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    position:relative;
+  }
+
+  header{
+    text-align:center;
+    margin-bottom:14px;
+  }
+  header .eyebrow{
+    font-size:11px;
+    letter-spacing:0.35em;
+    text-transform:uppercase;
+    color:var(--floodlight);
+    opacity:0.85;
+  }
+  header h1{
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size:34px;
+    margin:6px 0 4px;
+    letter-spacing:0.02em;
+  }
+  header .sub{
+    font-size:13px;
+    color:var(--text-dim);
+  }
+
+  /* Scoreboard */
+  #scoreboard{
+    display:flex;
+    align-items:center;
+    gap:18px;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:6px;
+    padding:12px 22px;
+    margin:16px 0 22px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+  }
+  .score-block{
+    text-align:center;
+    min-width:70px;
+  }
+  .score-block .label{
+    font-size:10px;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+  }
+  .score-block .value{
+    font-family: Georgia, serif;
+    font-size:30px;
+    line-height:1;
+    margin-top:4px;
+  }
+  .you .value{color:var(--accent);}
+  .cpu .value{color:var(--save);}
+  #scoreboard .vs{
+    font-size:11px;
+    color:var(--text-dim);
+    padding:0 4px;
+  }
+  #roundInfo{
+    font-size:11px;
+    letter-spacing:0.15em;
+    text-transform:uppercase;
+    color:var(--floodlight);
+    text-align:center;
+    margin-bottom:10px;
+    min-height:14px;
+  }
+
+  /* Pitch */
+  #pitch-holder{
+    position:relative;
+    width:100%;
+    max-width:560px;
+  }
+  #floodlights{
+    display:flex;
+    justify-content:space-between;
+    padding:0 6px;
+    margin-bottom:-6px;
+  }
+  .floodlight{
+    width:6px;height:34px;
+    background:linear-gradient(var(--text-dim), transparent);
+    position:relative;
+  }
+  .floodlight::after{
+    content:'';
+    position:absolute; top:-4px; left:50%;
+    width:16px; height:16px;
+    transform:translateX(-50%);
+    background:var(--floodlight);
+    border-radius:50%;
+    box-shadow:0 0 24px 10px var(--floodlight-glow);
+  }
+
+  #pitch{
+    position:relative;
+    width:100%;
+    aspect-ratio: 4 / 3;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        var(--grass-1) 0px, var(--grass-1) 40px,
+        var(--grass-2) 40px, var(--grass-2) 80px
+      );
+    border:2px solid var(--line);
+    border-top:none;
+    border-radius:0 0 8px 8px;
+    overflow:hidden;
+  }
+
+  /* goal */
+  #goal-area{
+    position:absolute;
+    top:6%; left:50%;
+    transform:translateX(-50%);
+    width:78%;
+    height:34%;
+  }
+  #goal-net{
+    position:absolute;
+    inset:0;
+    border:5px solid var(--line);
+    border-bottom:none;
+    background:
+      repeating-linear-gradient(0deg, rgba(244,241,234,0.18) 0 1px, transparent 1px 9px),
+      repeating-linear-gradient(90deg, rgba(244,241,234,0.18) 0 1px, transparent 1px 9px);
+  }
+  .zone-marker{
+    position:absolute;
+    bottom:-2px;
+    width:33.333%;
+    height:2px;
+    background:transparent;
+  }
+
+  /* zones for keeper / ball targeting, invisible structural guides */
+  .zone{
+    position:absolute;
+    top:0;
+    width:33.333%;
+    height:100%;
+  }
+  .zone.left{left:0;}
+  .zone.center{left:33.333%;}
+  .zone.right{left:66.666%;}
+
+  /* keeper */
+  #keeper{
+    position:absolute;
+    top:22%;
+    left:50%;
+    width:14%;
+    height:24%;
+    transform:translateX(-50%);
+    transition: transform 0.55s cubic-bezier(.2,.9,.3,1.2);
+    z-index:5;
+  }
+  #keeper .body{
+    width:100%; height:68%;
+    background:var(--save);
+    border-radius:6px 6px 2px 2px;
+    position:relative;
+    box-shadow: inset -3px 0 0 rgba(0,0,0,0.2);
+  }
+  #keeper .body::before,
+  #keeper .body::after{
+    content:'';
+    position:absolute;
+    top:8%;
+    width:22%;
+    height:55%;
+    background:#e8c398;
+    border-radius:4px;
+  }
+  #keeper .body::before{ left:-16%; }
+  #keeper .body::after{ right:-16%; }
+  #keeper .head{
+    width:46%; height:24%;
+    background:#e8c398;
+    border-radius:50%;
+    margin:0 auto;
+    position:relative;
+    top:-16%;
+  }
+  #keeper.dive-left{ transform:translateX(-50%) translateX(-88%) rotate(-38deg); }
+  #keeper.dive-right{ transform:translateX(-50%) translateX(88%) rotate(38deg); }
+  #keeper.dive-center{ transform:translateX(-50%) translateY(-8%) scale(1.06); }
+
+  /* penalty spot & ball */
+  #ball{
+    position:absolute;
+    left:50%; bottom:14%;
+    width:22px; height:22px;
+    margin-left:-11px;
+    border-radius:50%;
+    background:
+      radial-gradient(circle at 32% 28%, #ffffff, #d8d4c8 60%, #b7b2a2 100%);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.5), inset -2px -2px 4px rgba(0,0,0,0.25);
+    transition: transform 0.55s cubic-bezier(.3,.6,.2,1), left 0.55s cubic-bezier(.3,.6,.2,1), bottom 0.55s cubic-bezier(.3,.6,.2,1);
+    z-index:6;
+  }
+  #ball.fly-left{ left:18%; bottom:58%; }
+  #ball.fly-center{ left:50%; bottom:62%; }
+  #ball.fly-right{ left:82%; bottom:58%; }
+  #ball.hidden{ opacity:0; }
+
+  #penalty-spot{
+    position:absolute;
+    left:50%; bottom:14%;
+    width:6px; height:6px;
+    margin-left:-3px;
+    border-radius:50%;
+    background:var(--line);
+    opacity:0.7;
+  }
+
+  #result-flash{
+    position:absolute;
+    top:38%; left:50%;
+    transform:translate(-50%,-50%) scale(0.6);
+    font-family:Georgia, serif;
+    font-size:15px;
+    letter-spacing:0.15em;
+    text-transform:uppercase;
+    padding:8px 18px;
+    border-radius:4px;
+    opacity:0;
+    pointer-events:none;
+    z-index:10;
+    white-space:nowrap;
+  }
+  #result-flash.show{
+    animation: flash-in 1.1s ease forwards;
+  }
+  #result-flash.goal{ background:var(--accent); color:#1a0a05; }
+  #result-flash.save{ background:var(--save); color:#04121e; }
+  @keyframes flash-in{
+    0%{ opacity:0; transform:translate(-50%,-50%) scale(0.5); }
+    18%{ opacity:1; transform:translate(-50%,-50%) scale(1.08); }
+    30%{ transform:translate(-50%,-50%) scale(1); }
+    82%{ opacity:1; }
+    100%{ opacity:0; transform:translate(-50%,-70%) scale(1); }
+  }
+
+  /* controls */
+  #controls{
+    margin-top:22px;
+    width:100%;
+    max-width:560px;
+    text-align:center;
+  }
+  #prompt{
+    font-size:14px;
+    color:var(--text-dim);
+    margin-bottom:14px;
+    min-height:20px;
+  }
+  #prompt .who{ color:var(--floodlight); }
+
+  #zone-buttons{
+    display:flex;
+    gap:12px;
+    justify-content:center;
+  }
+  .zbtn{
+    flex:1;
+    max-width:150px;
+    padding:16px 8px;
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    color:var(--text);
+    font-family:'Courier New', monospace;
+    font-size:12px;
+    letter-spacing:0.15em;
+    text-transform:uppercase;
+    border-radius:5px;
+    cursor:pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  }
+  .zbtn:hover:not(:disabled){
+    border-color:var(--floodlight);
+    background:#101d38;
+  }
+  .zbtn:active:not(:disabled){ transform:scale(0.96); }
+  .zbtn:disabled{ opacity:0.35; cursor:default; }
+  .zbtn .arrow{ display:block; font-size:18px; margin-bottom:4px; }
+
+  #next-btn{
+    margin-top:18px;
+    padding:12px 30px;
+    background:var(--accent);
+    color:#1a0a05;
+    border:none;
+    border-radius:5px;
+    font-family:Georgia, serif;
+    font-size:14px;
+    letter-spacing:0.08em;
+    cursor:pointer;
+    display:none;
+  }
+  #next-btn:hover{ background:#ff7255; }
+
+  #footer-note{
+    margin-top:26px;
+    font-size:11px;
+    color:var(--text-dim);
+    text-align:center;
+    max-width:480px;
+    line-height:1.6;
+  }
+
+  /* Match over overlay */
+  #overlay{
+    position:fixed; inset:0;
+    background:rgba(3,7,16,0.86);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+    padding:20px;
+  }
+  #overlay.show{ display:flex; }
+  #overlay-card{
+    background:var(--panel);
+    border:1px solid var(--panel-border);
+    border-radius:8px;
+    padding:36px 32px;
+    text-align:center;
+    max-width:380px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.6);
+  }
+  #overlay-card .eyebrow{
+    font-size:11px;
+    letter-spacing:0.3em;
+    text-transform:uppercase;
+    color:var(--floodlight);
+  }
+  #overlay-card h2{
+    font-family:Georgia, serif;
+    font-size:28px;
+    margin:10px 0 6px;
+  }
+  #overlay-card p{
+    color:var(--text-dim);
+    font-size:13px;
+    margin-bottom:22px;
+  }
+  #overlay-card button{
+    padding:12px 28px;
+    background:var(--accent);
+    border:none;
+    color:#1a0a05;
+    border-radius:5px;
+    font-family:Georgia, serif;
+    font-size:14px;
+    cursor:pointer;
+  }
+  #overlay-card button:hover{ background:#ff7255; }
+
+  @media (max-width:480px){
+    header h1{ font-size:26px; }
+    .score-block .value{ font-size:24px; }
+    .zbtn{ font-size:10px; padding:14px 4px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="wrap">
+  <header>
+    <div class="eyebrow">Ночная серия · 11 метров</div>
+    <h1 class="display">Пенальти</h1>
+    <div class="sub">Бьёте — выбираете угол. Защищаетесь — выбираете, куда прыгнуть. После удара стороны меняются.</div>
+  </header>
+
+  <div id="scoreboard">
+    <div class="score-block you">
+      <div class="label">Вы</div>
+      <div class="value" id="youScore">0</div>
+    </div>
+    <div class="vs">—</div>
+    <div class="score-block cpu">
+      <div class="label">Соперник</div>
+      <div class="value" id="cpuScore">0</div>
+    </div>
+  </div>
+
+  <div id="roundInfo">Раунд 1 из 5</div>
+
+  <div id="pitch-holder">
+    <div id="floodlights">
+      <div class="floodlight"></div><div class="floodlight"></div><div class="floodlight"></div>
+      <div class="floodlight"></div><div class="floodlight"></div>
+    </div>
+    <div id="pitch">
+      <div id="goal-area">
+        <div id="goal-net"></div>
+      </div>
+      <div id="keeper">
+        <div class="head"></div>
+        <div class="body"></div>
+      </div>
+      <div id="penalty-spot"></div>
+      <div id="ball"></div>
+      <div id="result-flash"></div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <div id="prompt">Готовы? <span class="who">Вы бьёте пенальти.</span></div>
+    <div id="zone-buttons">
+      <button class="zbtn" data-zone="left"><span class="arrow">◤</span>Слева</button>
+      <button class="zbtn" data-zone="center"><span class="arrow">▲</span>Центр</button>
+      <button class="zbtn" data-zone="right"><span class="arrow">◥</span>Справа</button>
+    </div>
+    <button id="next-btn">Дальше →</button>
+  </div>
+
+  <div id="footer-note">
+    5 раундов на каждую сторону. При ничьей — серия «до первого промаха» в внезапной смерти.
+  </div>
+</div>
+
+<div id="overlay">
+  <div id="overlay-card">
+    <div class="eyebrow">Матч окончен</div>
+    <h2 id="overlay-title" class="display">Победа!</h2>
+    <p id="overlay-sub">Счёт по итогам серии</p>
+    <button id="restart-btn">Играть снова</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const TOTAL_ROUNDS = 5;
+  const ZONES = ['left','center','right'];
+
+  let state = {
+    round: 1,
+    phase: 'user_shoot', // 'user_shoot' | 'user_defend'
+    youScore: 0,
+    cpuScore: 0,
+    suddenDeath: false,
+    sdRound: 0,
+    locked: false,
+  };
+
+  const $ = (sel) => document.querySelector(sel);
+  const ball = $('#ball');
+  const keeper = $('#keeper');
+  const flash = $('#result-flash');
+  const prompt = $('#prompt');
+  const roundInfo = $('#roundInfo');
+  const zoneButtons = document.querySelectorAll('.zbtn');
+  const nextBtn = $('#next-btn');
+  const youScoreEl = $('#youScore');
+  const cpuScoreEl = $('#cpuScore');
+  const overlay = $('#overlay');
+
+  function randomZone(){
+    return ZONES[Math.floor(Math.random()*ZONES.length)];
+  }
+
+  function updateScoreboard(){
+    youScoreEl.textContent = state.youScore;
+    cpuScoreEl.textContent = state.cpuScore;
+  }
+
+  function updateRoundInfo(){
+    if(state.suddenDeath){
+      roundInfo.textContent = 'Серия пенальти · внезапная смерть, попытка ' + state.sdRound;
+    } else {
+      roundInfo.textContent = 'Раунд ' + state.round + ' из ' + TOTAL_ROUNDS;
+    }
+  }
+
+  function setPrompt(){
+    if(state.phase === 'user_shoot'){
+      prompt.innerHTML = 'Ваш удар. <span class="who">Выберите направление.</span>';
+    } else {
+      prompt.innerHTML = 'Соперник бьёт. <span class="who">Выберите, куда прыгнуть.</span>';
+    }
+  }
+
+  function resetBallAndKeeper(){
+    ball.className = '';
+    keeper.className = '';
+  }
+
+  function setButtonsEnabled(enabled){
+    zoneButtons.forEach(b => b.disabled = !enabled);
+  }
+
+  function showFlash(text, kind){
+    flash.textContent = text;
+    flash.className = '';
+    void flash.offsetWidth; // restart animation
+    flash.classList.add(kind, 'show');
+  }
+
+  function resolveRound(chosenZone){
+    if(state.locked) return;
+    state.locked = true;
+    setButtonsEnabled(false);
+    resetBallAndKeeper();
+
+    const isUserShooting = state.phase === 'user_shoot';
+    const keeperZone = randomZone(); // whoever is "in goal" (computer keeper OR user's guess) is always the diving/random side visually driven by keeper element
+
+    // In both phases the graphic keeper represents whoever is currently in goal.
+    // user_shoot: keeper = computer goalkeeper, random.
+    // user_defend: keeper = user (their chosen dive), attacker (computer) picks random shot zone.
+    let shotZone, diveZone, userIsScorer;
+
+    if(isUserShooting){
+      shotZone = chosenZone;      // user picked where to shoot
+      diveZone = keeperZone;      // computer keeper dives randomly
+    } else {
+      shotZone = keeperZone;      // computer attacker shoots randomly
+      diveZone = chosenZone;      // user picked where to dive
+    }
+
+    // animate
+    requestAnimationFrame(() => {
+      ball.classList.add('fly-' + shotZone);
+      keeper.classList.add('dive-' + diveZone);
+    });
+
+    setTimeout(() => {
+      const saved = (shotZone === diveZone);
+      let scored;
+      if(isUserShooting){
+        scored = !saved; // user scores if keeper didn't guess right
+        if(scored){ state.youScore++; showFlash('ГОЛ!', 'goal'); }
+        else { showFlash('СЭЙВ!', 'save'); }
+      } else {
+        scored = !saved; // computer scores if user (keeper) didn't guess right
+        if(scored){ state.cpuScore++; showFlash('ГОЛ СОПЕРНИКА', 'goal'); }
+        else { showFlash('ВЫ ОТБИЛИ!', 'save'); }
+      }
+      updateScoreboard();
+
+      setTimeout(() => {
+        advance();
+      }, 950);
+    }, 560);
+  }
+
+  function checkEarlyFinish(){
+    // Standard shootout early-finish logic across TOTAL_ROUNDS, only when not in sudden death
+    if(state.suddenDeath) return false;
+    const roundsLeftForYou = TOTAL_ROUNDS - state.round + (state.phase === 'user_shoot' ? 1 : 0);
+    const roundsLeftForCpu = TOTAL_ROUNDS - state.round + (state.phase === 'user_defend' ? 1 : 0);
+    if(state.youScore > state.cpuScore + roundsLeftForCpu) return true;
+    if(state.cpuScore > state.youScore + roundsLeftForYou) return true;
+    return false;
+  }
+
+  function advance(){
+    resetBallAndKeeper();
+    flash.classList.remove('show');
+
+    if(state.suddenDeath){
+      if(state.phase === 'user_shoot'){
+        state.phase = 'user_defend';
+      } else {
+        // completed one full sudden-death pair
+        if(state.youScore !== state.cpuScore){
+          return endMatch();
+        }
+        state.sdRound++;
+        state.phase = 'user_shoot';
+      }
+      updateRoundInfo();
+      setPrompt();
+      state.locked = false;
+      setButtonsEnabled(true);
+      return;
+    }
+
+    if(state.phase === 'user_shoot'){
+      state.phase = 'user_defend';
+    } else {
+      state.phase = 'user_shoot';
+      state.round++;
+    }
+
+    if(checkEarlyFinish()){
+      return endMatch();
+    }
+
+    if(state.round > TOTAL_ROUNDS){
+      if(state.youScore === state.cpuScore){
+        state.suddenDeath = true;
+        state.sdRound = 1;
+        state.phase = 'user_shoot';
+        updateRoundInfo();
+        setPrompt();
+        state.locked = false;
+        setButtonsEnabled(true);
+        return;
+      }
+      return endMatch();
+    }
+
+    updateRoundInfo();
+    setPrompt();
+    state.locked = false;
+    setButtonsEnabled(true);
+  }
+
+  function endMatch(){
+    setButtonsEnabled(false);
+    const title = $('#overlay-title');
+    const sub = $('#overlay-sub');
+    if(state.youScore > state.cpuScore){
+      title.textContent = 'Победа!';
+      sub.textContent = 'Вы выиграли серию ' + state.youScore + ' : ' + state.cpuScore;
+    } else if(state.cpuScore > state.youScore){
+      title.textContent = 'Поражение';
+      sub.textContent = 'Соперник выиграл серию ' + state.cpuScore + ' : ' + state.youScore;
+    } else {
+      title.textContent = 'Ничья';
+      sub.textContent = 'Счёт ' + state.youScore + ' : ' + state.cpuScore;
+    }
+    setTimeout(() => overlay.classList.add('show'), 500);
+  }
+
+  function restart(){
+    state = {
+      round: 1,
+      phase: 'user_shoot',
+      youScore: 0,
+      cpuScore: 0,
+      suddenDeath: false,
+      sdRound: 0,
+      locked: false,
+    };
+    overlay.classList.remove('show');
+    updateScoreboard();
+    updateRoundInfo();
+    setPrompt();
+    resetBallAndKeeper();
+    flash.classList.remove('show');
+    setButtonsEnabled(true);
+  }
+
+  zoneButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      resolveRound(btn.dataset.zone);
+    });
+  });
+
+  $('#restart-btn').addEventListener('click', restart);
+
+  // init
+  updateScoreboard();
+  updateRoundInfo();
+  setPrompt();
+})();
+</script>
+
+</body>
+</html>
